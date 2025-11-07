@@ -111,50 +111,33 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
             plot_candlesticks(ax1, pool_df, color=pool_colors.get(pool_name, '#333333'), alpha=0.9)
             plotted_pools.append((pool_name, pool_colors.get(pool_name, '#333333')))
 
-    # Plot interpolated segments as thin lines (gaps)
-    interp_df = df[df.get('is_interpolated', False)].copy()
-    if len(interp_df) > 0:
-        # Group by pool_name to separate the two migration gaps
-        interp_groups = interp_df.groupby('pool_name')
-
-        legend_added = False
-        for pool_name, interp_segment in interp_groups:
-            # Sort by timestamp
-            interp_segment = interp_segment.sort_values('timestamp')
-
-            # Plot interpolated data as dashed line
-            if not legend_added:
-                ax1.plot(interp_segment['date'], interp_segment['close'],
-                        color='#888888', linewidth=1.5, alpha=0.5, linestyle='--',
-                        label='Interpolated (Migration Gaps)')
-                legend_added = True
-            else:
-                ax1.plot(interp_segment['date'], interp_segment['close'],
-                        color='#888888', linewidth=1.5, alpha=0.5, linestyle='--')
-
-    # Add migration markers
+    # Add migration markers with minimal labels
     for event_name, timestamp in config.MIGRATION_DATES.items():
         migration_date = datetime.fromtimestamp(timestamp)
-        ax1.axvline(x=migration_date, color='red', linestyle='--',
-                   linewidth=1.5, alpha=0.7)
-        ax1.text(migration_date, ax1.get_ylim()[1] * 0.95,
-                event_name.replace('_', '\n').title(),
-                rotation=0, verticalalignment='top',
-                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.7),
-                fontsize=8)
+        ax1.axvline(x=migration_date, color='#666666', linestyle='--',
+                   linewidth=1, alpha=0.6, zorder=0)
 
-    # Create custom legend for candlesticks and interpolated data
+        # Create minimal label from event name
+        if 'mon3y_to_zera' in event_name:
+            label = 'M→Z'
+        elif 'Raydium_to_Meteora' in event_name:
+            label = 'R→M'
+        else:
+            label = event_name[:3].upper()
+
+        # Place label at top of chart, centered on line
+        ax1.text(migration_date, ax1.get_ylim()[1] * 0.98, label,
+                ha='center', va='top', fontsize=9, color='#666666',
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
+                         edgecolor='#666666', alpha=0.8, linewidth=0.5))
+
+    # Create custom legend
     legend_elements = []
 
     # Add legend entries for each plotted pool
     for pool_name, color in plotted_pools:
         legend_elements.append(Line2D([0], [0], color=color, linewidth=8,
                                      label=config.POOLS[pool_name]['name']))
-
-    # Add interpolated data to legend if it exists
-    if len(interp_df) > 0:
-        legend_elements.append(Line2D([0], [0], color='#888888', linewidth=2,
-                                     linestyle='--', label='Interpolated (Migration Gaps)'))
 
     ax1.set_xlabel('Date', fontsize=12)
     ax1.set_ylabel('Price (USD)', fontsize=12)
@@ -164,8 +147,10 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
     ax1.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
     plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
 
-    # Set x-axis limits to remove whitespace
-    ax1.set_xlim(df['date'].min(), df['date'].max())
+    # Set x-axis limits with padding to ensure all data fits
+    date_range = real_df['date'].max() - real_df['date'].min()
+    padding = date_range * 0.02  # 2% padding on each side
+    ax1.set_xlim(real_df['date'].min() - padding, real_df['date'].max() + padding)
 
     # Plot 2: Volume over time (with cutoffs at migrations)
     # Only plot real data (skip interpolated points)
@@ -186,11 +171,11 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
                    color=pool_colors.get(pool_name, '#333333'),
                    alpha=0.6, width=0.8)
 
-    # Add migration markers to volume chart
+    # Add migration markers to volume chart (matching price chart style)
     for event_name, timestamp in config.MIGRATION_DATES.items():
         migration_date = datetime.fromtimestamp(timestamp)
-        ax2.axvline(x=migration_date, color='red', linestyle='--',
-                   linewidth=1.5, alpha=0.7)
+        ax2.axvline(x=migration_date, color='#666666', linestyle='--',
+                   linewidth=1, alpha=0.6, zorder=0)
 
     ax2.set_xlabel('Date', fontsize=12)
     ax2.set_ylabel('Volume (USD)', fontsize=12)
@@ -199,8 +184,11 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
     ax2.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
     plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
 
-    # Set x-axis limits to remove whitespace
-    ax2.set_xlim(df['date'].min(), df['date'].max())
+    # Set x-axis limits with padding to match price chart
+    volume_df = df[~df.get('is_interpolated', False)].copy()
+    date_range_vol = volume_df['date'].max() - volume_df['date'].min()
+    padding_vol = date_range_vol * 0.02
+    ax2.set_xlim(volume_df['date'].min() - padding_vol, volume_df['date'].max() + padding_vol)
 
     plt.tight_layout()
 
