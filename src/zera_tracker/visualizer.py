@@ -162,7 +162,8 @@ def filter_by_minimum_distance(points, min_distance_days=5):
     for current_date, current_value in sorted_points[1:]:
         # Check distance from last kept point
         last_date, last_value = filtered[-1]
-        time_diff = (current_date - last_date).days
+        # Convert timedelta to days (handles both numpy and pandas timedelta)
+        time_diff = pd.Timedelta(current_date - last_date).total_seconds() / 86400
 
         if time_diff >= min_distance_days:
             # Far enough away, keep this point

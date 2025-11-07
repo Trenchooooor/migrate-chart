@@ -84,18 +84,23 @@ def main():
     # Step 5: Generate visualizations
     print("\n[5/5] Generating visualizations...")
     print("-" * 70)
+
+    # Define paths before try block
+    chart_path = f"{config.OUTPUT_DIR}/{config.CHART_FILENAME}"
+    comparison_path = f"{config.OUTPUT_DIR}/zera_comparison_chart.png"
+
     try:
         # Main price chart
-        chart_path = f"{config.OUTPUT_DIR}/{config.CHART_FILENAME}"
         create_price_chart(df, chart_path)
 
         # Comparison chart
-        comparison_path = f"{config.OUTPUT_DIR}/zera_comparison_chart.png"
         create_comparison_chart(df, comparison_path)
 
         print("✓ Visualizations completed")
     except Exception as e:
         print(f"\n✗ Error generating charts: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Final summary
     print("\n" + "="*70)
