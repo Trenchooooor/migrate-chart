@@ -146,11 +146,11 @@ def filter_by_minimum_distance(points, min_distance_days=5):
     Keeps the most prominent points when clustering occurs
 
     Args:
-        points: List of (date, value) tuples
+        points: List of (date, value) or (date, value, type) tuples
         min_distance_days: Minimum days between marked points
 
     Returns:
-        Filtered list of (date, value) tuples
+        Filtered list of tuples (same format as input)
     """
     if len(points) <= 1:
         return points
@@ -159,19 +159,24 @@ def filter_by_minimum_distance(points, min_distance_days=5):
     sorted_points = sorted(points, key=lambda x: x[0])
     filtered = [sorted_points[0]]  # Always keep the first point
 
-    for current_date, current_value in sorted_points[1:]:
-        # Check distance from last kept point
-        last_date, last_value = filtered[-1]
+    for current_point in sorted_points[1:]:
+        current_date = current_point[0]
+        current_value = current_point[1]
+
+        last_point = filtered[-1]
+        last_date = last_point[0]
+        last_value = last_point[1]
+
         # Convert timedelta to days (handles both numpy and pandas timedelta)
         time_diff = pd.Timedelta(current_date - last_date).total_seconds() / 86400
 
         if time_diff >= min_distance_days:
             # Far enough away, keep this point
-            filtered.append((current_date, current_value))
+            filtered.append(current_point)
         else:
-            # Too close, keep the more extreme value
+            # Too close, keep the more extreme value (further from zero)
             if abs(current_value) > abs(last_value):
-                filtered[-1] = (current_date, current_value)
+                filtered[-1] = current_point
 
     return filtered
 
@@ -225,39 +230,80 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
             plot_candlesticks(ax1, pool_df, color=pool_colors.get(pool_name, '#333333'), alpha=0.9)
             plotted_pools.append((pool_name, pool_colors.get(pool_name, '#333333')))
 
-            # Find and mark local peaks (highs) for this pool
-            peaks = find_local_peaks(pool_df, window=7, prominence_threshold=0.20)
-            # Filter peaks to ensure minimum distance between markers
-            filtered_peaks = filter_by_minimum_distance(peaks, min_distance_days=7)
+            # Always label the last candlestick (current price)
+            last_row = pool_df.iloc[-1]
+            last_date = last_row['date']
+            last_close = last_row['close']
 
-            for peak_date, peak_high in filtered_peaks:
-                # Add green arrow pointing down to the peak
-                ax1.annotate('', xy=(peak_date, peak_high),
-                           xytext=(peak_date, peak_high * 1.08),
-                           arrowprops=dict(arrowstyle='->', color='#26a69a',
-                                         lw=1.5, alpha=0.7),
-                           zorder=10)
-                # Add price label in green
-                ax1.text(peak_date, peak_high * 1.10, f'${peak_high:.4f}',
-                        ha='center', va='bottom', fontsize=7, color='#26a69a',
-                        weight='bold', alpha=0.8)
+            # Mark with a larger circle
+            ax1.plot(last_date, last_close, 'o', color='#4169E1', markersize=8,
+                    markeredgecolor='white', markeredgewidth=1.5, zorder=12)
 
-            # Find and mark local troughs (lows) for this pool
-            troughs = find_local_troughs(pool_df, window=7, prominence_threshold=0.20)
-            # Filter troughs to ensure minimum distance between markers
-            filtered_troughs = filter_by_minimum_distance(troughs, min_distance_days=7)
+            # Position label to the right
+            label_date = last_date + pd.Timedelta(days=2)
+            ax1.annotate(f'${last_close:.4f}',
+                       xy=(last_date, last_close),
+                       xytext=(label_date, last_close),
+                       fontsize=8, color='white', weight='bold',
+                       bbox=dict(boxstyle='round,pad=0.5', facecolor='#4169E1',
+                                edgecolor='white', alpha=1.0, linewidth=1.5),
+                       ha='left', va='center',
+                       arrowprops=dict(arrowstyle='-', color='#4169E1',
+                                     lw=1.5, alpha=0.8),
+                       zorder=12)
 
-            for trough_date, trough_low in filtered_troughs:
-                # Add red arrow pointing up to the trough
-                ax1.annotate('', xy=(trough_date, trough_low),
-                           xytext=(trough_date, trough_low * 0.92),
-                           arrowprops=dict(arrowstyle='->', color='#ef5350',
-                                         lw=1.5, alpha=0.7),
-                           zorder=10)
-                # Add price label in red
-                ax1.text(trough_date, trough_low * 0.90, f'${trough_low:.4f}',
-                        ha='center', va='top', fontsize=7, color='#ef5350',
-                        weight='bold', alpha=0.8)
+            # Find peaks and troughs
+            peaks = find_local_peaks(pool_df, window=7, prominence_threshold=0.25)
+            troughs = find_local_troughs(pool_df, window=7, prominence_threshold=0.25)
+
+            # Combine peaks and troughs with type markers
+            all_markers = []
+            for date, value in peaks:
+                all_markers.append((date, value, 'peak'))
+            for date, value in troughs:
+                all_markers.append((date, value, 'trough'))
+
+            # Filter combined list to prevent ANY overlaps
+            filtered_markers = filter_by_minimum_distance(all_markers, min_distance_days=10)
+
+            # Plot filtered markers with side labels
+            for marker in filtered_markers:
+                date, value, marker_type = marker
+
+                if marker_type == 'peak':
+                    # Mark the peak with a small circle
+                    ax1.plot(date, value, 'o', color='#26a69a', markersize=6,
+                            markeredgecolor='white', markeredgewidth=1, zorder=11)
+
+                    # Position label to the right with connecting line
+                    label_date = date + pd.Timedelta(days=2)
+                    ax1.annotate(f'${value:.4f}',
+                               xy=(date, value),
+                               xytext=(label_date, value),
+                               fontsize=7, color='white', weight='bold',
+                               bbox=dict(boxstyle='round,pad=0.4', facecolor='#26a69a',
+                                        edgecolor='white', alpha=0.9, linewidth=1),
+                               ha='left', va='center',
+                               arrowprops=dict(arrowstyle='-', color='#26a69a',
+                                             lw=1, alpha=0.6),
+                               zorder=10)
+                else:  # trough
+                    # Mark the trough with a small circle
+                    ax1.plot(date, value, 'o', color='#ef5350', markersize=6,
+                            markeredgecolor='white', markeredgewidth=1, zorder=11)
+
+                    # Position label to the right with connecting line
+                    label_date = date + pd.Timedelta(days=2)
+                    ax1.annotate(f'${value:.4f}',
+                               xy=(date, value),
+                               xytext=(label_date, value),
+                               fontsize=7, color='white', weight='bold',
+                               bbox=dict(boxstyle='round,pad=0.4', facecolor='#ef5350',
+                                        edgecolor='white', alpha=0.9, linewidth=1),
+                               ha='left', va='center',
+                               arrowprops=dict(arrowstyle='-', color='#ef5350',
+                                             lw=1, alpha=0.6),
+                               zorder=10)
 
     # Add migration markers with transition labels
     for event_name, timestamp in config.MIGRATION_DATES.items():
