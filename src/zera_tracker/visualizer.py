@@ -111,33 +111,41 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
             plot_candlesticks(ax1, pool_df, color=pool_colors.get(pool_name, '#333333'), alpha=0.9)
             plotted_pools.append((pool_name, pool_colors.get(pool_name, '#333333')))
 
-    # Add migration markers with minimal labels
+    # Add migration markers with transition labels
     for event_name, timestamp in config.MIGRATION_DATES.items():
         migration_date = datetime.fromtimestamp(timestamp)
         ax1.axvline(x=migration_date, color='#666666', linestyle='--',
                    linewidth=1, alpha=0.6, zorder=0)
 
-        # Create minimal label from event name
+        # Create transition label from event name
         if 'mon3y_to_zera' in event_name:
-            label = 'M→Z'
+            label = 'MON3Y → Raydium'
         elif 'Raydium_to_Meteora' in event_name:
-            label = 'R→M'
+            label = 'Raydium → Meteora'
         else:
-            label = event_name[:3].upper()
+            label = event_name.replace('_', ' → ')
 
         # Place label at top of chart, centered on line
         ax1.text(migration_date, ax1.get_ylim()[1] * 0.98, label,
-                ha='center', va='top', fontsize=9, color='#666666',
+                ha='center', va='top', fontsize=8, color='#666666',
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='white',
                          edgecolor='#666666', alpha=0.8, linewidth=0.5))
 
-    # Create custom legend
+    # Create custom legend with simple names
     legend_elements = []
+
+    # Simple label mapping
+    simple_labels = {
+        'mon3y': 'MON3Y',
+        'zera_Raydium': 'Raydium',
+        'zera_Meteora': 'Meteora'
+    }
 
     # Add legend entries for each plotted pool
     for pool_name, color in plotted_pools:
+        label = simple_labels.get(pool_name, pool_name)
         legend_elements.append(Line2D([0], [0], color=color, linewidth=8,
-                                     label=config.POOLS[pool_name]['name']))
+                                     label=label))
 
     ax1.set_xlabel('Date', fontsize=12)
     ax1.set_ylabel('Price (USD)', fontsize=12)
@@ -166,8 +174,9 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
             pool_df = pool_df[pool_df['date'] < migration_2]
 
         if len(pool_df) > 0:
+            label = simple_labels.get(pool_name, pool_name)
             ax2.bar(pool_df['date'], pool_df['volume'],
-                   label=config.POOLS[pool_name]['name'],
+                   label=label,
                    color=pool_colors.get(pool_name, '#333333'),
                    alpha=0.6, width=0.8)
 
@@ -220,11 +229,18 @@ def create_comparison_chart(df: pd.DataFrame, output_path: str = None):
 
     pool_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1']
 
+    # Simple label mapping
+    simple_labels = {
+        'mon3y': 'MON3Y',
+        'zera_Raydium': 'Raydium',
+        'zera_Meteora': 'Meteora'
+    }
+
     # 1. Average Price by Pool
     avg_prices = real_df.groupby('pool_name')['close'].mean()
     ax1.bar(range(len(avg_prices)), avg_prices.values, color=pool_colors)
     ax1.set_xticks(range(len(avg_prices)))
-    ax1.set_xticklabels([config.POOLS[p]['name'] for p in avg_prices.index],
+    ax1.set_xticklabels([simple_labels.get(p, p) for p in avg_prices.index],
                          rotation=15, ha='right')
     ax1.set_ylabel('Average Price (USD)')
     ax1.set_title('Average Price by Pool')
@@ -234,7 +250,7 @@ def create_comparison_chart(df: pd.DataFrame, output_path: str = None):
     total_volumes = real_df.groupby('pool_name')['volume'].sum()
     ax2.bar(range(len(total_volumes)), total_volumes.values, color=pool_colors)
     ax2.set_xticks(range(len(total_volumes)))
-    ax2.set_xticklabels([config.POOLS[p]['name'] for p in total_volumes.index],
+    ax2.set_xticklabels([simple_labels.get(p, p) for p in total_volumes.index],
                          rotation=15, ha='right')
     ax2.set_ylabel('Total Volume (USD)')
     ax2.set_title('Total Volume by Pool')
@@ -244,7 +260,7 @@ def create_comparison_chart(df: pd.DataFrame, output_path: str = None):
     volatility = real_df.groupby('pool_name')['close'].std()
     ax3.bar(range(len(volatility)), volatility.values, color=pool_colors)
     ax3.set_xticks(range(len(volatility)))
-    ax3.set_xticklabels([config.POOLS[p]['name'] for p in volatility.index],
+    ax3.set_xticklabels([simple_labels.get(p, p) for p in volatility.index],
                          rotation=15, ha='right')
     ax3.set_ylabel('Price Std Dev (USD)')
     ax3.set_title('Price Volatility by Pool')
@@ -254,7 +270,7 @@ def create_comparison_chart(df: pd.DataFrame, output_path: str = None):
     days_active = real_df.groupby('pool_name').size()
     ax4.bar(range(len(days_active)), days_active.values, color=pool_colors)
     ax4.set_xticks(range(len(days_active)))
-    ax4.set_xticklabels([config.POOLS[p]['name'] for p in days_active.index],
+    ax4.set_xticklabels([simple_labels.get(p, p) for p in days_active.index],
                          rotation=15, ha='right')
     ax4.set_ylabel('Days')
     ax4.set_title('Days Active by Pool')
