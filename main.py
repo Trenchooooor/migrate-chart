@@ -11,6 +11,7 @@ This script:
 
 import os
 import sys
+import argparse
 from datetime import datetime
 
 # Import our modules
@@ -27,7 +28,7 @@ from src.zera_tracker import (
 )
 
 
-def main():
+def main(use_cache: bool = False):
     """Main execution function"""
     print("="*70)
     print("ZERA HISTORICAL PRICE TRACKER")
@@ -36,11 +37,14 @@ def main():
     print("\nThis tool tracks the complete price history of ZERA token,")
     print("including its previous incarnation as M0N3Y and pool migrations.\n")
 
-    # Step 1: Fetch data from GeckoTerminal API
-    print("\n[1/5] Fetching data from GeckoTerminal API...")
+    # Step 1: Fetch data from GeckoTerminal API (or load from cache)
+    if use_cache:
+        print("\n[1/5] Loading data from cache...")
+    else:
+        print("\n[1/5] Fetching data from GeckoTerminal API...")
     print("-" * 70)
     try:
-        all_pool_data = fetch_all_pools()
+        all_pool_data = fetch_all_pools(use_cache=use_cache)
         print("\n✓ Data fetching completed")
     except Exception as e:
         print(f"\n✗ Error fetching data: {e}")
@@ -119,8 +123,16 @@ def main():
 
 
 if __name__ == "__main__":
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(
+        description='ZERA Historical Price Tracker - Track token prices across pool migrations'
+    )
+    parser.add_argument('--cache', action='store_true',
+                       help='Use cached API data instead of fetching from GeckoTerminal')
+    args = parser.parse_args()
+
     try:
-        main()
+        main(use_cache=args.cache)
     except KeyboardInterrupt:
         print("\n\nProcess interrupted by user. Exiting...")
         sys.exit(0)

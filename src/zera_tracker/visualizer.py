@@ -226,9 +226,9 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
             plotted_pools.append((pool_name, pool_colors.get(pool_name, '#333333')))
 
             # Find and mark local peaks (highs) for this pool
-            peaks = find_local_peaks(pool_df, window=5, prominence_threshold=0.15)
+            peaks = find_local_peaks(pool_df, window=7, prominence_threshold=0.20)
             # Filter peaks to ensure minimum distance between markers
-            filtered_peaks = filter_by_minimum_distance(peaks, min_distance_days=5)
+            filtered_peaks = filter_by_minimum_distance(peaks, min_distance_days=7)
 
             for peak_date, peak_high in filtered_peaks:
                 # Add green arrow pointing down to the peak
@@ -243,9 +243,9 @@ def create_price_chart(df: pd.DataFrame, output_path: str = None):
                         weight='bold', alpha=0.8)
 
             # Find and mark local troughs (lows) for this pool
-            troughs = find_local_troughs(pool_df, window=5, prominence_threshold=0.15)
+            troughs = find_local_troughs(pool_df, window=7, prominence_threshold=0.20)
             # Filter troughs to ensure minimum distance between markers
-            filtered_troughs = filter_by_minimum_distance(troughs, min_distance_days=5)
+            filtered_troughs = filter_by_minimum_distance(troughs, min_distance_days=7)
 
             for trough_date, trough_low in filtered_troughs:
                 # Add red arrow pointing up to the trough

@@ -4,7 +4,10 @@ Data fetcher for GeckoTerminal API
 
 import requests
 import time
+import json
+import os
 from typing import Dict, List
+from datetime import datetime
 import config
 
 
@@ -41,13 +44,70 @@ def fetch_pool_data(pool_address: str, retries: int = 3) -> Dict:
     return None
 
 
-def fetch_all_pools() -> Dict[str, Dict]:
+def save_cache(data: Dict, cache_path: str):
+    """
+    Save fetched data to cache file
+
+    Args:
+        data: Dictionary to cache
+        cache_path: Path to save cache file
+    """
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, 'w') as f:
+        json.dump({
+            'cached_at': datetime.now().isoformat(),
+            'data': data
+        }, f, indent=2)
+    print(f"✓ Data cached to: {cache_path}")
+
+
+def load_cache(cache_path: str) -> Dict:
+    """
+    Load data from cache file
+
+    Args:
+        cache_path: Path to cache file
+
+    Returns:
+        Cached data dictionary or None if not found
+    """
+    if not os.path.exists(cache_path):
+        return None
+
+    try:
+        with open(cache_path, 'r') as f:
+            cache = json.load(f)
+            cached_time = datetime.fromisoformat(cache['cached_at'])
+            print(f"✓ Loading cached data from {cached_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            return cache['data']
+    except Exception as e:
+        print(f"✗ Error loading cache: {e}")
+        return None
+
+
+def fetch_all_pools(use_cache: bool = False, cache_path: str = None) -> Dict[str, Dict]:
     """
     Fetch data for all pools defined in config
+
+    Args:
+        use_cache: If True, load from cache instead of API
+        cache_path: Path to cache file
 
     Returns:
         Dictionary mapping pool names to their data
     """
+    if cache_path is None:
+        cache_path = f"{config.OUTPUT_DIR}/api_cache.json"
+
+    # Try to load from cache if requested
+    if use_cache:
+        cached_data = load_cache(cache_path)
+        if cached_data:
+            return cached_data
+        else:
+            print("Cache not found, fetching from API...")
+
+    # Fetch from API
     all_pool_data = {}
 
     for pool_name, pool_info in config.POOLS.items():
@@ -69,6 +129,9 @@ def fetch_all_pools() -> Dict[str, Dict]:
 
         # Be nice to the API
         time.sleep(1)
+
+    # Save to cache
+    save_cache(all_pool_data, cache_path)
 
     return all_pool_data
 
